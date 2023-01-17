@@ -19,6 +19,7 @@ const SteeringLimits TOYOTA_STEERING_LIMITS = {
 const LongitudinalLimits TOYOTA_LONG_LIMITS = {
   .max_accel = 2000,   // 2.0 m/s2
   .min_accel = -3500,  // -3.5 m/s2
+  .inactive_accel = -500
 };
 
 // panda interceptor threshold needs to be equivalent to openpilot threshold to avoid controls mismatches
@@ -31,7 +32,9 @@ const CanMsg TOYOTA_TX_MSGS[] = {{0x283, 0, 7}, {0x2E6, 0, 8}, {0x2E7, 0, 8}, {0
                                  {0x128, 1, 6}, {0x141, 1, 4}, {0x160, 1, 8}, {0x161, 1, 7}, {0x470, 1, 4},  // DSU bus 1
                                  {0x2E4, 0, 5}, {0x191, 0, 8}, {0x411, 0, 8}, {0x412, 0, 8}, {0x343, 0, 8}, {0x1D2, 0, 8},  // LKAS + ACC
                                  {0x750, 0, 8}, // dp - white list 0x750 for Enhanced Diagnostic Request
-                                 {0x200, 0, 6}};  // interceptor
+                                 {0x200, 0, 6},  // interceptor
+                                 {0x2A2, 0, 8}}; // 0x343 overwrite, CAN_FILTER_ACC_CONTROL
+                                 
 
 AddrCheckStruct toyota_addr_checks[] = {
   {.msg = {{ 0xaa, 0, 8, .check_checksum = false, .expected_timestep = 12000U}, { 0 }, { 0 }}},
@@ -154,7 +157,7 @@ static int toyota_tx_hook(CANPacket_t *to_send) {
     }
 
     // ACCEL: safety check on byte 1-2
-    if (addr == 0x343) {
+    if (addr == 0x343 || addr == 0x2A2) {
       int desired_accel = (GET_BYTE(to_send, 0) << 8) | GET_BYTE(to_send, 1);
       desired_accel = to_signed(desired_accel, 16);
 
